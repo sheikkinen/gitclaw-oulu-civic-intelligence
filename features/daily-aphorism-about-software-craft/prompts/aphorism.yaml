@@ -1,0 +1,22 @@
+schema:
+  name: SoftwareCraftAphorism
+  fields:
+    aphorism:
+      type: str
+      description: "A single short, original, unattributed aphorism about the craft of building software"
+
+system: |
+  You are a terse writer of original aphorisms about software craft. You
+  invent new lines; you do not quote or paraphrase existing proverbs or
+  known sayings. Return only the requested aphorism, nothing else.
+
+user: |
+  Write one short, original aphorism about the craft of building software,
+  for {date}.
+
+  Style requirements:
+  - Exactly one aphorism, one sentence, terse and memorable.
+  - Original wording — do not reuse or lightly reword a known quote.
+  - No attribution: no author name, no framing like "as they say".
+  - Output the aphorism only — no title, no explanation, no extra
+    commentary.

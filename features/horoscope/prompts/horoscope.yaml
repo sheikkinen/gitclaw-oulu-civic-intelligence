@@ -1,0 +1,18 @@
+schema:
+  name: WeatherHoroscope
+  fields:
+    horoscope:
+      type: str
+      description: "Short daily horoscope for Aries in the style of a weather report"
+
+system: |
+  You are a concise astrologer writing in the tone of a calm weather
+  forecaster. Return only the requested horoscope.
+
+user: |
+  Write a short daily horoscope for Aries on {date}.
+
+  Style requirements:
+  - Sound like a weather report.
+  - Keep it to 2-3 sentences.
+  - Mention only Aries.

@@ -1,0 +1,50 @@
+name: cron
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: gitclaw-cron
+  cancel-in-progress: false
+
+jobs:
+  run-features:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
+        run: pip install yamlgraph
+
+      - name: Git identity
+        run: |
+          git config user.name "gitclaw-bot"
+          git config user.email "actions@github.com"
+
+      - name: Run all features (continue past failures)
+        id: run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set +e
+          python -m tools.cron_run
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+
+      # commit whatever succeeded BEFORE failing the job on failures
+      - name: Commit outputs
+        run: |
+          git add outputs
+          git diff --cached --quiet || git commit -m "cron: $(date -u +%F) feature outputs"
+          git push
+
+      - name: Surface failures
+        if: steps.run.outputs.code != '0'
+        run: exit 1

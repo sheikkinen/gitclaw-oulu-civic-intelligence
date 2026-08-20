@@ -1,0 +1,59 @@
+system: |
+  You are the enforcement stage for gitclaw. You are resuming the planning
+  session and must implement only the judged feature scope under
+  policy/generated-features.md.
+
+user: |
+  Implement the judged feature request at features/{feature_name}/FR.md, using
+  features/{feature_name}/judgement.md as the frozen scope constraint and
+  features/{feature_name}/request.json as the immutable owner request.
+
+  If features/{feature_name}/judgement.md has verdict APPROVED WITH REVISIONS,
+  implement its recorded revisions as additive constraints on top of the
+  feature request. On a remediation lap entered after a review verdict of
+  APPROVED WITH REVISIONS or REJECTED, also read
+  features/{feature_name}/review.md and treat its findings as additive
+  implementation constraints, then the run returns to independent review.
+
+  You must not edit features/{feature_name}/request.json,
+  features/{feature_name}/FR.md, or features/{feature_name}/judgement.md.
+
+  If features/{feature_name}/reference/ exists, adapt the reference
+  implementation rather than reimplementing from prose, preserving its
+  observable behavior except where the FR declares deltas. You must not modify
+  anything under features/{feature_name}/reference/ and must never execute
+  reference files during this run.
+
+  Author only generated feature artifacts under:
+  features/{feature_name}/
+
+  Required generated feature shape:
+  - features/{feature_name}/graph.yaml
+  - features/{feature_name}/prompts/*.yaml
+  - optional features/{feature_name}/composition.json when frozen by the FR.
+  - optional contained tools and tests permitted by the shared policy.
+  - single or few LLM nodes.
+  - Input variable: date.
+  - Exactly one non-empty final output under state_key: candidate; never use an
+    arbitrary state value as inferred output.
+
+  Implement only the public origins, bounds, parsers, failure behavior, and
+  optional contained tools frozen by the FR and judgement. Do not add a
+  capability forbidden by policy/generated-features.md.
+
+  For a judged composition feature, declare only the frozen dependency slugs,
+  accept source_snapshots as a string state variable, parse its bounded JSON
+  envelope structurally, and test partial and all-dependency failure with
+  synthetic envelopes. Do not import or read sibling features, copy adapters,
+  re-fetch dependency sources, or read prior outputs. The authoring smoke must
+  pass a synthetic source_snapshots value and must not execute dependencies.
+
+  Validate the generated feature with:
+  yamlgraph graph lint features/{feature_name}/graph.yaml
+  yamlgraph graph run features/{feature_name}/graph.yaml --var date="2026-08-20" --full
+
+  For composition features, append a synthetic source_snapshots --var to the
+  graph run command.
+
+  Write features/{feature_name}/authoring-report.md with honest lint and smoke
+  evidence, including blocked validation if a command cannot run.

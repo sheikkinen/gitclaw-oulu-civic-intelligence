@@ -1,0 +1,443 @@
+version: "1.0"
+name: gitclaw-issue-to-feature
+description: Orchestrate issue-to-feature authoring with Copilot CLI nodes.
+
+prompts_relative: true
+prompts_dir: prompts
+
+state:
+  issue_number: str
+  feature_name: str
+  request_sha256: str
+  reference_sha256: str
+
+tools:
+  ledger_seen_commit:
+    type: shell
+    command: >-
+      python -m tools.ledger record {issue_number} seen
+      && git add state/issues.jsonl
+      && git commit -m "gitclaw: #{issue_number} seen"
+      && git pull --rebase && git push
+    description: "Record the seen ledger transition and commit state/issues.jsonl."
+    parse: text
+    timeout: 120
+
+  ledger_planned_commit:
+    type: shell
+    command: >-
+      python -m tools.ledger record {issue_number} planned
+      && git add state/issues.jsonl
+      && git commit -m "gitclaw: #{issue_number} planned"
+      && git pull --rebase && git push
+    description: "Record the planned ledger transition and commit state/issues.jsonl."
+    parse: text
+    timeout: 120
+
+  ledger_judged_approved_commit:
+    type: shell
+    command: >-
+      python -m tools.ledger record {issue_number} judged_approved
+      && git add state/issues.jsonl
+      && git commit -m "gitclaw: #{issue_number} judged_approved"
+      && git pull --rebase && git push
+    description: "Record the judged_approved ledger transition and commit state/issues.jsonl."
+    parse: text
+    timeout: 120
+
+  ledger_enforced_commit:
+    type: shell
+    command: >-
+      python -m tools.ledger record {issue_number} enforced
+      && git add state/issues.jsonl
+      && git commit -m "gitclaw: #{issue_number} enforced"
+      && git pull --rebase && git push
+    description: "Record the enforced ledger transition and commit state/issues.jsonl."
+    parse: text
+    timeout: 120
+
+  ledger_reviewed_approved_commit:
+    type: shell
+    command: >-
+      python -m tools.ledger record {issue_number} reviewed_approved
+      && git add state/issues.jsonl
+      && git commit -m "gitclaw: #{issue_number} reviewed_approved"
+      && git pull --rebase && git push
+    description: "Record the reviewed_approved ledger transition and commit state/issues.jsonl."
+    parse: text
+    timeout: 120
+
+  ledger_reviewed_rejected_commit:
+    type: shell
+    command: >-
+      python -m tools.ledger record {issue_number} reviewed_rejected
+      && git add state/issues.jsonl
+      && git commit -m "gitclaw: #{issue_number} reviewed_rejected"
+      && git pull --rebase && git push
+    description: "Record the reviewed_rejected ledger transition and commit state/issues.jsonl."
+    parse: text
+    timeout: 120
+
+  reject_judgement_close:
+    type: shell
+    command: >-
+      python -m tools.ledger record {issue_number} judged_rejected
+      && git add state/issues.jsonl
+      && git commit -m "gitclaw: #{issue_number} judged_rejected"
+      && git pull --rebase && git push
+      && gh issue comment {issue_number} --body-file features/{feature_name}/judgement.md
+      && gh issue close {issue_number}
+    description: "Record a rejected judgement, commit the ledger, post judgement.md, and close the issue."
+    parse: text
+    timeout: 120
+
+  reject_review_final_close:
+    type: shell
+    command: >-
+      python -m tools.ledger record {issue_number} reviewed_rejected
+      && python -m tools.ledger record {issue_number} reviewed_rejected_final
+      && git add state/issues.jsonl
+      && git commit -m "gitclaw: #{issue_number} reviewed_rejected_final"
+      && git pull --rebase && git push
+      && gh issue comment {issue_number} --body-file features/{feature_name}/review.md
+      && gh issue close {issue_number}
+    description: "Record the final rejected review path, commit the ledger, post review.md, and close the issue."
+    parse: text
+    timeout: 120
+
+  contain_feature_diff:
+    type: shell
+    command: >-
+      python -m tools.contain {feature_name}
+    description: "Fail closed unless every changed path is inside the current feature allowlist."
+    parse: text
+    timeout: 120
+
+  verify_request:
+    type: shell
+    command: >-
+      python -m tools.request_contract verify {feature_name} {request_sha256}
+      && python -m tools.reference_assets verify {feature_name} '{reference_sha256}'
+    description: "Fail closed unless request.json and any staged reference match their trusted hashes."
+    parse: text
+    timeout: 30
+
+  read_judgement_file_decision:
+    type: shell
+    command: >-
+      sed -n 's/^\*\*Verdict:\*\* \([A-Z][A-Z ]*[A-Z]\).*/\1/p'
+      features/{feature_name}/judgement.md 2>/dev/null
+      | head -1
+      | tr -d '\n'
+    description: "Read the judgement decision from features/{feature_name}/judgement.md."
+    parse: text
+    timeout: 30
+
+  read_review_file_decision:
+    type: shell
+    command: >-
+      sed -n 's/^\*\*Verdict:\*\* \([A-Z][A-Z ]*[A-Z]\).*/\1/p'
+      features/{feature_name}/review.md 2>/dev/null
+      | head -1
+      | tr -d '\n'
+    description: "Read the review decision from features/{feature_name}/review.md."
+    parse: text
+    timeout: 30
+
+  push_feature_and_close:
+    type: shell
+    command: >-
+      git add features/{feature_name} state/issues.jsonl
+      && git commit -m "feat(gitclaw): #{issue_number} {feature_name}"
+      && git pull --rebase &&
+      git push
+      && python -m tools.ledger record {issue_number} pushed
+      && python -m tools.ledger record {issue_number} closed
+      && git add state/issues.jsonl
+      && git commit -m "gitclaw: #{issue_number} closed"
+      && git pull --rebase &&
+      git push
+      && gh issue comment {issue_number} --body "Implemented in $(git log -1 --format=%H -- features/{feature_name})"
+      && gh issue close {issue_number}
+    description: "Commit and push the contained feature, record pushed and closed ledger transitions, push the ledger, then comment the post-rebase SHA and close."
+    parse: text
+    timeout: 120
+
+nodes:
+  ledger_seen:
+    type: tool
+    tool: ledger_seen_commit
+    variables:
+      issue_number: "{state.issue_number}"
+    state_key: ledger_seen_result
+    on_error: fail
+
+  plan:
+    type: copilot
+    backend: cli
+    prompt: plan
+    cli_flags:
+      allow_all_paths: true
+      allow_all_tools: true
+      model: claude-sonnet-5
+    timeout: 900
+    variables:
+      issue_number: "{state.issue_number}"
+      feature_name: "{state.feature_name}"
+    state_key: plan_result
+
+  verify_request_after_plan:
+    type: tool
+    tool: verify_request
+    variables:
+      feature_name: "{state.feature_name}"
+      request_sha256: "{state.request_sha256}"
+      reference_sha256: "{state.reference_sha256}"
+    state_key: request_verified_after_plan
+    on_error: fail
+
+  ledger_planned:
+    type: tool
+    tool: ledger_planned_commit
+    variables:
+      issue_number: "{state.issue_number}"
+    state_key: ledger_planned_result
+    on_error: fail
+
+  judge:
+    type: copilot
+    backend: cli
+    prompt: judge
+    cli_flags:
+      allow_all_paths: true
+      allow_all_tools: true
+      model: claude-sonnet-5
+    timeout: 900
+    variables:
+      feature_name: "{state.feature_name}"
+    state_key: judge_result
+
+  verify_request_after_judge:
+    type: tool
+    tool: verify_request
+    variables:
+      feature_name: "{state.feature_name}"
+      request_sha256: "{state.request_sha256}"
+      reference_sha256: "{state.reference_sha256}"
+    state_key: request_verified_after_judge
+    on_error: fail
+
+  read_judge_verdict:
+    type: tool
+    tool: read_judgement_file_decision
+    variables:
+      feature_name: "{state.feature_name}"
+    state_key: judge_verdict
+
+  ledger_judged_approved:
+    type: tool
+    tool: ledger_judged_approved_commit
+    variables:
+      issue_number: "{state.issue_number}"
+    state_key: ledger_judged_approved_result
+    on_error: fail
+
+  reject_close:
+    type: tool
+    tool: reject_judgement_close
+    variables:
+      issue_number: "{state.issue_number}"
+      feature_name: "{state.feature_name}"
+    state_key: reject_close_result
+    on_error: fail
+
+  enforce:
+    type: copilot
+    backend: cli
+    prompt: enforce
+    cli_flags:
+      allow_all_paths: true
+      allow_all_tools: true
+      model: claude-sonnet-5
+      resume: "{state.plan_result.session_id}"
+    timeout: 900
+    variables:
+      feature_name: "{state.feature_name}"
+    state_key: enforce_result
+    skip_if_exists: false
+
+  verify_request_after_enforce:
+    type: tool
+    tool: verify_request
+    variables:
+      feature_name: "{state.feature_name}"
+      request_sha256: "{state.request_sha256}"
+      reference_sha256: "{state.reference_sha256}"
+    state_key: request_verified_after_enforce
+    on_error: fail
+    skip_if_exists: false
+
+  ledger_enforced:
+    type: tool
+    tool: ledger_enforced_commit
+    variables:
+      issue_number: "{state.issue_number}"
+    state_key: ledger_enforced_result
+    on_error: fail
+
+  review:
+    type: copilot
+    backend: cli
+    prompt: review
+    cli_flags:
+      allow_all_paths: true
+      allow_all_tools: true
+      model: claude-sonnet-5
+    timeout: 900
+    variables:
+      feature_name: "{state.feature_name}"
+    state_key: review_result
+    skip_if_exists: false
+
+  verify_request_after_review:
+    type: tool
+    tool: verify_request
+    variables:
+      feature_name: "{state.feature_name}"
+      request_sha256: "{state.request_sha256}"
+      reference_sha256: "{state.reference_sha256}"
+    state_key: request_verified_after_review
+    on_error: fail
+    skip_if_exists: false
+
+  read_review_verdict:
+    type: tool
+    tool: read_review_file_decision
+    variables:
+      feature_name: "{state.feature_name}"
+    state_key: review_verdict
+    skip_if_exists: false
+
+  ledger_reviewed_approved:
+    type: tool
+    tool: ledger_reviewed_approved_commit
+    variables:
+      issue_number: "{state.issue_number}"
+    state_key: ledger_reviewed_approved_result
+    on_error: fail
+
+  ledger_reviewed_rejected:
+    type: tool
+    tool: ledger_reviewed_rejected_commit
+    variables:
+      issue_number: "{state.issue_number}"
+    state_key: ledger_reviewed_rejected_result
+    on_error: fail
+
+  reject_final:
+    type: tool
+    tool: reject_review_final_close
+    variables:
+      issue_number: "{state.issue_number}"
+      feature_name: "{state.feature_name}"
+    state_key: reject_final_result
+    on_error: fail
+
+  contain:
+    type: tool
+    tool: contain_feature_diff
+    variables:
+      feature_name: "{state.feature_name}"
+    state_key: contain_result
+    on_error: fail
+
+  push:
+    type: tool
+    tool: push_feature_and_close
+    variables:
+      issue_number: "{state.issue_number}"
+      feature_name: "{state.feature_name}"
+    state_key: push_result
+    on_error: fail
+
+edges:
+  - from: START
+    to: ledger_seen
+  - from: ledger_seen
+    to: plan
+  - from: plan
+    to: verify_request_after_plan
+  - from: verify_request_after_plan
+    to: ledger_planned
+  - from: ledger_planned
+    to: judge
+  - from: judge
+    to: verify_request_after_judge
+  - from: verify_request_after_judge
+    to: read_judge_verdict
+  - from: read_judge_verdict
+    to: ledger_judged_approved
+    condition: "judge_verdict == 'APPROVED' or judge_verdict == 'APPROVED WITH REVISIONS'"
+  - from: ledger_judged_approved
+    to: enforce
+  - from: read_judge_verdict
+    to: reject_close
+    condition: "judge_verdict == 'REJECTED'"
+  - from: reject_close
+    to: END
+  - from: read_judge_verdict
+    to: END
+    condition: "judge_verdict != 'APPROVED' and judge_verdict != 'APPROVED WITH REVISIONS' and judge_verdict != 'REJECTED'"
+  - from: enforce
+    to: verify_request_after_enforce
+  - from: verify_request_after_enforce
+    to: ledger_enforced
+  - from: ledger_enforced
+    to: review
+  - from: review
+    to: verify_request_after_review
+  - from: verify_request_after_review
+    to: read_review_verdict
+  - from: read_review_verdict
+    to: ledger_reviewed_approved
+    condition: "review_verdict == 'APPROVED'"
+  - from: ledger_reviewed_approved
+    to: contain
+  - from: contain
+    to: push
+  - from: push
+    to: END
+  - from: read_review_verdict
+    to: ledger_reviewed_rejected
+    condition: "review_verdict == 'REJECTED' and _loop_counts.enforce == null"
+  - from: read_review_verdict
+    to: ledger_reviewed_rejected
+    condition: "review_verdict == 'APPROVED WITH REVISIONS' and _loop_counts.enforce == null"
+  - from: read_review_verdict
+    to: ledger_reviewed_rejected
+    condition: "review_verdict == 'REJECTED' and _loop_counts.enforce < 1"
+  - from: read_review_verdict
+    to: ledger_reviewed_rejected
+    condition: "review_verdict == 'APPROVED WITH REVISIONS' and _loop_counts.enforce < 1"
+  - from: ledger_reviewed_rejected
+    to: enforce
+  - from: read_review_verdict
+    to: reject_final
+    condition: "review_verdict == 'REJECTED' and _loop_counts.enforce >= 1"
+  - from: read_review_verdict
+    to: reject_final
+    condition: "review_verdict == 'APPROVED WITH REVISIONS' and _loop_counts.enforce >= 1"
+  - from: reject_final
+    to: END
+  - from: read_review_verdict
+    to: END
+    condition: "review_verdict != 'APPROVED' and review_verdict != 'REJECTED' and review_verdict != 'APPROVED WITH REVISIONS'"
+
+loop_limits:
+  enforce: 2
+  verify_request_after_enforce: 2
+  ledger_enforced: 2
+  ledger_reviewed_rejected: 1
+  review: 2
+  verify_request_after_review: 2
+  read_review_verdict: 2

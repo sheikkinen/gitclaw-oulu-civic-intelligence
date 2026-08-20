@@ -1,0 +1,26 @@
+version: "1.0"
+name: aphorism-cron-fixture
+description: Generate a daily original aphorism about the craft of building software.
+
+prompts_relative: true
+prompts_dir: prompts
+
+defaults:
+  temperature: 0.7
+
+state:
+  date: str
+
+nodes:
+  generate:
+    type: llm
+    prompt: aphorism
+    variables:
+      date: "{state.date}"
+    state_key: aphorism
+
+edges:
+  - from: START
+    to: generate
+  - from: generate
+    to: END

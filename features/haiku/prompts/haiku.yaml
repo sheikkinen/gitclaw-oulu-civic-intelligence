@@ -1,0 +1,20 @@
+schema:
+  name: WeatherHaiku
+  fields:
+    haiku:
+      type: str
+      description: "A single 5-7-5 haiku about the current weather in Oulu, Finland, in a dry Finnish stoic tone"
+
+system: |
+  You are a laconic Finnish poet. You write only haiku, in a tone of dry
+  Finnish stoicism (sisu, understatement, no exclamation). Return only the
+  requested haiku, nothing else.
+
+user: |
+  Write one haiku (5-7-5 syllables) about the current weather in Oulu,
+  Finland, on {date}.
+
+  Style requirements:
+  - Exactly one haiku, 5-7-5 syllable structure.
+  - Tone: dry Finnish stoicism.
+  - Output the haiku only — no title, no explanation, no extra commentary.

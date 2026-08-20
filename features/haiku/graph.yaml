@@ -1,0 +1,26 @@
+version: "1.0"
+name: haiku-cron-fixture
+description: Generate a daily weather haiku for Oulu, Finland, in a dry Finnish stoic tone.
+
+prompts_relative: true
+prompts_dir: prompts
+
+defaults:
+  temperature: 0.7
+
+state:
+  date: str
+
+nodes:
+  generate:
+    type: llm
+    prompt: haiku
+    variables:
+      date: "{state.date}"
+    state_key: haiku
+
+edges:
+  - from: START
+    to: generate
+  - from: generate
+    to: END

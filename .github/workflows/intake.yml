@@ -1,0 +1,114 @@
+name: intake
+
+on:
+  issues:
+    types: [opened, labeled]
+
+# single-writer ledger: serialize intake runs
+concurrency:
+  group: gitclaw-intake
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    # Trust gate (FR-827 AC-05): sole barrier between anon input and
+    # LLM + secrets. Never CONTRIBUTOR; on 'labeled' verify the SENDER
+    # (issue forms can auto-apply labels).
+    if: >-
+      (github.event.action == 'opened' &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)) ||
+      (github.event.action == 'labeled' &&
+       github.event.label.name == 'gitclaw' &&
+       github.event.sender.login == github.repository_owner)
+    runs-on: ubuntu-latest
+    env:
+      GITCLAW_REPOSITORY: ${{ github.repository }}
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install runtime
+        run: |
+          npm install -g @github/copilot
+          pip install yamlgraph
+
+      # git identity BEFORE the run: ledger transitions commit mid-pipeline
+      - name: Git identity
+        run: |
+          git config user.name "gitclaw-bot"
+          git config user.email "actions@github.com"
+
+      - name: Idempotency gate
+        id: gate
+        run: |
+          set +e
+          python -m tools.ledger should-run "${{ github.event.issue.number }}"
+          code=$?
+          set -e
+          case $code in
+            0)  echo "verdict=run" >> "$GITHUB_OUTPUT" ;;
+            78) echo "verdict=skip-terminal" >> "$GITHUB_OUTPUT" ;;
+            65) echo "verdict=skip-interrupted" >> "$GITHUB_OUTPUT" ;;
+            *)  exit "$code" ;;
+          esac
+
+      - name: Report interrupted state
+        if: steps.gate.outputs.verdict == 'skip-interrupted'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" \
+            --body "gitclaw: pipeline previously interrupted mid-run (non-terminal ledger state). Human recovery required — see state/issues.jsonl."
+          exit 1
+
+      - name: Feature slug
+        if: steps.gate.outputs.verdict == 'run'
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: echo "FEATURE=$(python -m tools.slug "$ISSUE_TITLE" "${{ github.event.issue.number }}")" >> "$GITHUB_ENV"
+
+      - name: Immutable owner request
+        if: steps.gate.outputs.verdict == 'run'
+        env:
+          # untrusted event text enters ONLY via env, never inline in scripts
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          REQUEST_SHA256="$(python -m tools.request_contract write "$FEATURE" "${{ github.event.issue.number }}")"
+          echo "REQUEST_SHA256=$REQUEST_SHA256" >> "$GITHUB_ENV"
+
+      - name: Reference assets
+        if: steps.gate.outputs.verdict == 'run'
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          SET_NAME="$(python -m tools.reference_assets select)"
+          REFERENCE_SHA256=""
+          if [ -n "$SET_NAME" ]; then
+            REFERENCE_SHA256="$(python -m tools.reference_assets stage "$FEATURE" "$SET_NAME")"
+          fi
+          echo "REFERENCE_SHA256=$REFERENCE_SHA256" >> "$GITHUB_ENV"
+
+      - name: Run pipeline
+        if: steps.gate.outputs.verdict == 'run'
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          yamlgraph graph run gitclaw.yaml \
+            --var issue_number="${{ github.event.issue.number }}" \
+            --var feature_name="$FEATURE" \
+            --var request_sha256="$REQUEST_SHA256" \
+            --var reference_sha256="$REFERENCE_SHA256" \
+            --full

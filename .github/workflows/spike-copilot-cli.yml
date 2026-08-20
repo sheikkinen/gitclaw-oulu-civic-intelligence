@@ -1,0 +1,29 @@
+name: spike-copilot-cli
+
+# FR-827 AC-01: prove Copilot CLI installs, authenticates, and answers
+# one prompt on a plain ubuntu-latest runner using only repo secrets.
+# If this fails, enforcement STOPS (judgement C-3) — no api fallback.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Copilot CLI
+        run: |
+          npm install -g @github/copilot
+          copilot --version
+
+      - name: Headless auth + one prompt
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
+        run: |
+          OUT=$(copilot --silent -p "Reply with exactly: GITCLAW-SPIKE-OK")
+          echo "copilot output: $OUT"
+          test "$OUT" = "GITCLAW-SPIKE-OK"

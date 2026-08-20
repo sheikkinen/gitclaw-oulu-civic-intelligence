@@ -1,0 +1,72 @@
+....................FFFF.................                                [100%]
+=================================== FAILURES ===================================
+________________________ test_slug_unique_no_collision _________________________
+
+tmp_path = PosixPath('/private/var/folders/dx/cygn8k4d4xd4fhnmrqs7z3vh0000gn/T/pytest-of-sheikki/pytest-111/test_slug_unique_no_collision0')
+
+    def test_slug_unique_no_collision(tmp_path):
+>       assert slug.unique("Daily haiku", 7, root=tmp_path) == "daily-haiku"
+               ^^^^^^^^^^^
+E       AttributeError: module 'tools.slug' has no attribute 'unique'
+
+tests/test_intake_tools.py:20: AttributeError
+___________________ test_slug_unique_collision_appends_issue ___________________
+
+tmp_path = PosixPath('/private/var/folders/dx/cygn8k4d4xd4fhnmrqs7z3vh0000gn/T/pytest-of-sheikki/pytest-111/test_slug_unique_collision_app0')
+
+    def test_slug_unique_collision_appends_issue(tmp_path):
+        # two similar titles must not share features/<name>/
+        (tmp_path / "daily-haiku").mkdir()
+>       assert slug.unique("Daily haiku", 7, root=tmp_path) == "daily-haiku-7"
+               ^^^^^^^^^^^
+E       AttributeError: module 'tools.slug' has no attribute 'unique'
+
+tests/test_intake_tools.py:26: AttributeError
+___________________ test_slug_unique_collision_stays_bounded ___________________
+
+tmp_path = PosixPath('/private/var/folders/dx/cygn8k4d4xd4fhnmrqs7z3vh0000gn/T/pytest-of-sheikki/pytest-111/test_slug_unique_collision_sta0')
+
+    def test_slug_unique_collision_stays_bounded(tmp_path):
+        long_title = "x " * 100
+        (tmp_path / slug.make(long_title)).mkdir()
+>       s = slug.unique(long_title, 12345, root=tmp_path)
+            ^^^^^^^^^^^
+E       AttributeError: module 'tools.slug' has no attribute 'unique'
+
+tests/test_intake_tools.py:32: AttributeError
+______________________ test_run_feature_timeout_recorded _______________________
+
+tmp_path = PosixPath('/private/var/folders/dx/cygn8k4d4xd4fhnmrqs7z3vh0000gn/T/pytest-of-sheikki/pytest-111/test_run_feature_timeout_recor0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x113103100>
+
+    def test_run_feature_timeout_recorded(tmp_path, monkeypatch):
+        # a hung feature must be recorded as failed, not crash the loop
+        import subprocess
+    
+        def hang(*a, **kw):
+            raise subprocess.TimeoutExpired(cmd="yamlgraph", timeout=600)
+    
+        monkeypatch.setattr(cron_run.subprocess, "run", hang)
+>       ok, reason = cron_run.run_feature(tmp_path / "features" / "slow" / "graph.yaml", "2026-08-20")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_intake_tools.py:44: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/cron_run.py:47: in run_feature
+    proc = subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = (['yamlgraph', 'graph', 'run', '/private/var/folders/dx/cygn8k4d4xd4fhnmrqs7z3vh0000gn/T/pytest-of-sheikki/pytest-111/test_run_feature_timeout_recor0/features/slow/graph.yaml', '--var', 'date=2026-08-20', ...],)
+kw = {'capture_output': True, 'text': True, 'timeout': 600}
+
+    def hang(*a, **kw):
+>       raise subprocess.TimeoutExpired(cmd="yamlgraph", timeout=600)
+E       subprocess.TimeoutExpired: Command 'yamlgraph' timed out after 600 seconds
+
+tests/test_intake_tools.py:41: TimeoutExpired
+=========================== short test summary info ============================
+FAILED tests/test_intake_tools.py::test_slug_unique_no_collision - AttributeE...
+FAILED tests/test_intake_tools.py::test_slug_unique_collision_appends_issue
+FAILED tests/test_intake_tools.py::test_slug_unique_collision_stays_bounded
+FAILED tests/test_intake_tools.py::test_run_feature_timeout_recorded - subpro...
+4 failed, 37 passed in 0.17s
