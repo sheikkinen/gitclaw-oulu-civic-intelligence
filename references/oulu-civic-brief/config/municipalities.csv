@@ -1,0 +1,14 @@
+# Municipality configurations
+# Format: code|name|platform|base_url|fmi_place|lat|lon|events_rss|sotkanet_region
+564|Oulu|triplan|https://asiakirjat.ouka.fi/ktwebscr|oulu|65.01|25.47|https://visitoulu.fi/feed/|261
+91|Helsinki|ahjo|https://paatokset.hel.fi|helsinki|60.17|24.94||91
+837|Tampere|casem|https://tampere.cloudnc.fi/fi-FI|tampere|61.50|23.79||378
+49|Espoo|dynasty|https://espoo.oncloudos.com/fi-FI|espoo|60.21|24.66||128
+853|Turku|dynasty|https://ah.turku.fi/fi-FI|turku|60.45|22.27||396
+179|Jyväskylä|triplan|https://julkinen.jkl.fi/ktwebbin/dbisa.dll/ktwebscr|jyväskylä|62.24|25.75||211
+297|Kuopio|dynasty|https://kuopio.oncloudos.com/fi-FI|kuopio|62.89|27.68||246
+398|Lahti|unknown||lahti|60.98|25.66||315
+609|Pori|dynasty|https://pori.cloudnc.fi/fi-FI|pori|61.48|21.80||340
+698|Rovaniemi|dynasty|https://rovaniemi.cloudnc.fi/fi-FI|rovaniemi|66.50|25.72||353
+92|Vantaa|dynasty|https://dynasty.vantaa.fi/fi-FI|vantaa|60.29|25.04||406
+109|Hämeenlinna|triplan|https://hameenlinna.tweb.fi/ktwebscr|hämeenlinna|60.99|24.46||163
